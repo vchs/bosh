@@ -79,6 +79,7 @@ module Bosh::Stemcell
         :bosh_sysctl,
         :bosh_ntpdate,
         :bosh_sudoers,
+        :rsyslog,
         # Micro BOSH
         :bosh_micro,
         # Install GRUB/kernel/etc
