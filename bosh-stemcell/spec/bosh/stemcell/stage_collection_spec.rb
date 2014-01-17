@@ -110,6 +110,23 @@ module Bosh::Stemcell
       ]
     }
 
+    let(:vsphere_srm_ubuntu_infrastructure_stages) {
+      [
+        :system_open_vm_tools,
+        :system_vsphere_cdrom,
+        :system_vdiskmanager,
+        :system_parameters,
+        :bosh_clean,
+        :bosh_harden,
+        :image_create,
+        :image_install_grub,
+        :image_vsphere_vmx,
+        :image_vsphere_ovf,
+        :image_vsphere_prepare_stemcell,
+        :stemcell
+      ]
+    }
+
     let(:vsphere_centos_infrastructure_stages) {
       [
         #:system_open_vm_tools,
@@ -190,6 +207,14 @@ module Bosh::Stemcell
             it 'has the correct stages' do
               expect(stage_collection.all_stages)
                 .to eq(ubuntu_stages + agent_stages + vsphere_ubuntu_infrastructure_stages)
+            end
+
+            context 'SRM feature is enabled' do
+              it 'has the correct stages' do
+                ENV['SRM'] = 'true'
+                expect(stage_collection.all_stages)
+                  .to eq(ubuntu_stages + agent_stages + vsphere_srm_ubuntu_infrastructure_stages)
+              end
             end
           end
 
