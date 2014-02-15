@@ -153,7 +153,9 @@ module Bosh::Agent
       env_file = File.join(@settings_mount_point, 'env')
 
       begin
-        settings_json = File.read(env_file)
+        content = File.read(env_file)
+        settings_json = find_settings_json(content)
+        @logger.info("Settings json is successfully read: #{settings_json}")
         @settings = Yajl::Parser.new.parse(settings_json)
       rescue Exception => ex
         fail Bosh::Agent::LoadSettingsError,
@@ -176,6 +178,32 @@ module Bosh::Agent
     def remove_vmdk_disk
       Bosh::Exec.sh "umount #@settings_mount_point 2>&1"
       FileUtils.rm_rf(@settings_mount_point)
+    end
+
+    def find_settings_json(content)
+      search_index, begin_index, end_index = 0, -1, -1
+      while search_index < content.size
+        if (content[search_index] == 'V' && content[search_index+1] == 'M' && content[search_index+2] == '_')
+          if content[search_index..search_index+28] == 'VM_ENVIRONMENT_SETTINGS_BEGIN'
+            begin_index = search_index + 29
+            search_index = begin_index + 1
+            next
+          end
+
+          if content[search_index..search_index+26] == 'VM_ENVIRONMENT_SETTINGS_END'
+            fail Bosh::Agent::LoadSettingsError,
+                 'Unable to find string VM_ENVIRONMENT_SETTINGS_BEGIN in settings file' if begin_index < 0
+            end_index = search_index - 1
+            break
+          end
+        end
+
+        search_index += 1
+      end
+
+      fail Bosh::Agent::LoadSettingsError,
+           'Unable to find string VM_ENVIRONMENT_SETTINGS_END in settings file' if end_index < 0
+      content[begin_index..end_index].rstrip
     end
   end
 end
