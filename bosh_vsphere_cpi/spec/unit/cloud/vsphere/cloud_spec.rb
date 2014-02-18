@@ -801,17 +801,9 @@ vcenters:
           .ordered
           .with("datacenter1", "datastore1", "vm1/env.json", anything)
         subject
-          .should_receive(:generate_vmdk_iso)
+          .should_receive(:generate_vmdk)
           .ordered
           .and_return "local_vmdk_file_dir"
-        subject
-          .should_receive(:convert_iso_to_vmdk)
-          .ordered
-          .with("local_vmdk_file_dir")
-        subject
-          .should_receive(:convert_vmdk_to_esx_type)
-          .ordered
-          .with("local_vmdk_file_dir")
         subject
           .should_receive(:upload_vmdk_file)
           .ordered
@@ -827,6 +819,85 @@ vcenters:
         expect do
           subject.send(:set_vmdk_content, vm, location, vm_env)
         end.to_not raise_error
+      end
+    end
+
+    describe '#update_settings_json' do
+      it 'updates json information' do
+        content = 'VM_ENVIRONMENT_SETTINGS_BEGIN{"vm"}VM_ENVIRONMENT_SETTINGS_END'
+        subject.send(:update_settings_json, content, settings_json)
+        content.bytesize.should eql settings_json_with_spaces.bytesize
+        content.should eql settings_json_with_spaces
+      end
+
+      context 'VM_ENVIRONMENT_SETTINGS_BEGIN string is missing' do
+        it 'raises an exception' do
+          content = settings_json_with_spaces
+          expect do
+            subject
+              .send(:update_settings_json, content[29..-1], settings_json)
+          end.to raise_exception 'Unable to find string VM_ENVIRONMENT_SETTINGS_BEGIN in settings file'
+        end
+      end
+
+      context 'VM_ENVIRONMENT_SETTINGS_END string is missing' do
+        it 'raises an exception' do
+          content = settings_json_with_spaces
+          expect do
+            subject
+              .send(:update_settings_json, content[0..-27], settings_json)
+          end.to raise_exception 'Unable to find string VM_ENVIRONMENT_SETTINGS_END in settings file'
+        end
+      end
+
+      context 'settings_json exceeds 1MB' do
+        it 'raises an exception' do
+          content = 'VM_ENVIRONMENT_SETTINGS_BEGIN{"vm"}VM_ENVIRONMENT_SETTINGS_END'
+          settings_json = ' ' * 1025 * 1024
+          expect do
+            subject.send(:update_settings_json, content, settings_json)
+          end.to raise_exception 'settings_json exceeds 1MB'
+        end
+      end
+
+      private
+
+      def settings_json
+        %q[{"vm":{"name":"vm-273a202e-eedf-4475-a4a1-66c6d2628742","id":"vm-51290"},"disks":{"ephemeral":1,"persistent":{"250":2},"system":0},"mbus":"nats://user:pass@11.0.0.11:4222","networks":{"network_a":{"netmask":"255.255.248.0","mac":"00:50:56:89:17:70","ip":"172.30.40.115","default":["gateway","dns"],"gateway":"172.30.40.1","dns":["172.30.22.153","172.30.22.154"],"cloud_properties":{"name":"VLAN440"}}},"blobstore":{"provider":"simple","options":{"password":"Ag3Nt","user":"agent","endpoint":"http://172.30.40.11:25250"}},"ntp":["ntp01.las01.emcatmos.com","ntp02.las01.emcatmos.com"],"agent_id":"a26efbe5-4845-44a0-9323-b8e36191a2c8"}]
+      end
+
+      def settings_json_with_spaces
+        space_size = 1024 * 1024 - settings_json.bytesize
+        "VM_ENVIRONMENT_SETTINGS_BEGIN#{settings_json}#{' ' * space_size}VM_ENVIRONMENT_SETTINGS_END"
+      end
+    end
+
+    describe '#generate_vmdk' do
+
+      after do
+        `rm -rf #@local_vmdk_file_dir` unless @local_vmdk_file_dir.nil?
+      end
+
+      it 'generates vmdk files successfully' do
+        vmdk_template =
+          File.expand_path('../../../../../../stemcell_builder/stages/system_vmdk_template/assets',
+                           __FILE__)
+        File
+          .should_receive(:join)
+          .with(anything, 'vmdk_template')
+          .and_return vmdk_template
+
+        @local_vmdk_file_dir = subject.send(:generate_vmdk, settings_json)
+        exists = File.exists?("#{@local_vmdk_file_dir}/env.vmdk")
+        exists.should == true
+        exists = File.exists?("#{@local_vmdk_file_dir}/env-flat.vmdk")
+        exists.should == true
+      end
+
+      private
+
+      def settings_json
+        %q[{"vm":{"name":"vm-273a202e-eedf-4475-a4a1-66c6d2628742","id":"vm-51290"},"disks":{"ephemeral":1,"persistent":{"250":2},"system":0},"mbus":"nats://user:pass@11.0.0.11:4222","networks":{"network_a":{"netmask":"255.255.248.0","mac":"00:50:56:89:17:70","ip":"172.30.40.115","default":["gateway","dns"],"gateway":"172.30.40.1","dns":["172.30.22.153","172.30.22.154"],"cloud_properties":{"name":"VLAN440"}}},"blobstore":{"provider":"simple","options":{"password":"Ag3Nt","user":"agent","endpoint":"http://172.30.40.11:25250"}},"ntp":["ntp01.las01.emcatmos.com","ntp02.las01.emcatmos.com"],"agent_id":"a26efbe5-4845-44a0-9323-b8e36191a2c8"}]
       end
     end
 
