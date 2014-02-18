@@ -1168,23 +1168,46 @@ module VSphereCloud
       @genisoimage ||= which(%w{genisoimage mkisofs})
     end
 
-    def generate_vmdk_iso(env)
-      path = Dir.mktmpdir
-      env_path = File.join(path, 'env')
-      iso_path = File.join(path, 'env.iso')
-      File.open(env_path, 'w') { |f| f.write(env) }
+    def generate_vmdk(env)
+      module_dir = (`ls -d /lib/modules/3.*-virtual | tail -1`).strip
+      vmdk_template_dir = File.join(module_dir, 'vmdk_template')
+      fail "vmdk_template_dir #{vmdk_template_dir} does not exist" unless File.exists?(vmdk_template_dir)
 
-      # HACK: Write a dummy file to make iso file exceed 1 MB
-      # Because SRM needs at least 1 MB to replicate a disk
-      File.open(File.join(path, 'env_dummy'), 'w') do |f|
-        193000.times do |i|
-          f.write(i)
+      path = Dir.mktmpdir
+      # copy descriptor file
+      FileUtils.cp("#{vmdk_template_dir}/env.vmdk", "#{path}/env.vmdk")
+
+      # update content of flat vmdk file
+      content = File.open("#{vmdk_template_dir}/env-flat.vmdk", "rb") { |file| file.read }
+      update_settings_json(content, env)
+      File.open("#{path}/env-flat.vmdk", 'w') { |file| file.write(content) }
+      path
+    end
+
+    def update_settings_json(content, settings_json)
+      search_index, begin_index, end_index = 0, -1, -1
+      while search_index < content.size
+        if (content[search_index] == 'V' && content[search_index+1] == 'M' && content[search_index+2] == '_')
+          if content[search_index..search_index+28] == 'VM_ENVIRONMENT_SETTINGS_BEGIN'
+            begin_index = search_index + 29
+            search_index = begin_index + 1
+            next
+          end
+
+          if content[search_index..search_index+26] == 'VM_ENVIRONMENT_SETTINGS_END'
+            fail 'Unable to find string VM_ENVIRONMENT_SETTINGS_BEGIN in settings file' if begin_index < 0
+            end_index = search_index - 1
+            break
+          end
         end
+
+        search_index += 1
       end
 
-      output = `#{genisoimage} -o #{iso_path} #{env_path}* 2>&1`
-      raise "#{$?.exitstatus} -#{output}" if $?.exitstatus != 0
-      path
+      fail 'Unable to find string VM_ENVIRONMENT_SETTINGS_END in settings file' if end_index < 0
+      space_size = 1024 * 1024 - settings_json.bytesize # Make total of 1MB stuffing spaces at the end
+      fail 'settings_json exceeds 1MB' if space_size < 0
+      content[begin_index..end_index] = "#{settings_json}#{' ' * space_size}"
     end
 
     def upload_vmdk_file(location, local_vmdk_file_dir)
@@ -1203,27 +1226,6 @@ module VSphereCloud
       @qemu_img ||= which(['qemu-img'])
     end
 
-    def convert_iso_to_vmdk(tmp_dir)
-      iso_file = File.join(tmp_dir, 'env.iso')
-      fail "ISO file #{iso_file} does not exist!" if !File.exists?(iso_file)
-      output = `#{qemu_img} convert -O vmdk #{iso_file} #{File.join(tmp_dir, 'env_source.vmdk')} 2>&1`
-      fail "#{$?.exitstatus} -#{output}" if $?.exitstatus != 0
-    end
-
-    def convert_vmdk_to_esx_type(tmp_dir)
-      env_source_vmdk = File.join(tmp_dir, 'env_source.vmdk')
-      fail "ENV source vmdk file #{env_source_vmdk} does not exist!" if !File.exists?(env_source_vmdk)
-      target_vmdk_file = File.join(tmp_dir, 'env.vmdk')
-      [target_vmdk_file, File.join(tmp_dir, 'env-flat.vmdk')].each do |f|
-        File.delete(f) if File.exists?(f)
-      end
-
-      module_dir = (`ls -d /lib/modules/3.*-virtual | tail -1`).strip
-      vdiskmanager = "#{module_dir}/vdiskmanager/bin/vmware-vdiskmanager"
-      output = `#{vdiskmanager} -r #{env_source_vmdk} -t 4 #{target_vmdk_file} 2>&1`
-      fail "#{$?.exitstatus} -#{output}" if $?.exitstatus != 0
-    end
-
     def set_vmdk_content(vm, location, env)
       @logger.info("Setting env from vmdk")
       env_json = JSON.dump(env)
@@ -1235,11 +1237,8 @@ module VSphereCloud
                   location[:datastore],
                   "#{location[:vm]}/env.json", env_json)
 
-      local_vmdk_file_dir = generate_vmdk_iso(env_json)
+      local_vmdk_file_dir = generate_vmdk(env_json)
       begin
-        convert_iso_to_vmdk(local_vmdk_file_dir)
-        convert_vmdk_to_esx_type(local_vmdk_file_dir)
-
         upload_vmdk_file(location, local_vmdk_file_dir)
       ensure
         FileUtils.remove_entry_secure local_vmdk_file_dir
