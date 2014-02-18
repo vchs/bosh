@@ -58,9 +58,7 @@ module Bosh::Stemcell
           if operating_system.instance_of?(OperatingSystem::Centos)
             centos_vsphere_stages
           else
-            stages = vsphere_stages
-            stages.delete(:system_vdiskmanager) unless srm
-            stages
+            vsphere_stages
           end
       end
     end
@@ -172,7 +170,6 @@ module Bosh::Stemcell
       [
         :system_open_vm_tools,
         :system_vsphere_cdrom,
-        :system_vdiskmanager,
         :system_vmdk_template,
         # Misc
         :system_parameters,
@@ -188,10 +185,6 @@ module Bosh::Stemcell
         # Final stemcell
         :stemcell,
       ]
-    end
-
-    def srm
-      ENV['SRM'] == 'true'
     end
   end
 end
