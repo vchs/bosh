@@ -128,8 +128,9 @@ eos
   end
 
   context "load settings from vmdk disk" do
-    before do
-      proc_contents = <<-eos
+    describe 'load_settings' do
+      before do
+        proc_contents = <<-eos
 drive name:
 drive speed:
 drive # of slots:
@@ -151,52 +152,84 @@ Can read MRW:
 Can write MRW:
 Can write RAM:
 eos
-      subject
-        .should_receive(:check_cdrom)
-        .and_raise Bosh::Agent::LoadSettingsError
 
-      settings.stub(:mount_vmdk_disk)
-      settings.stub(:create_settings_mount_point)
-      settings.stub(:remove_vmdk_disk)
+        subject
+          .should_receive(:check_cdrom)
+          .and_raise Bosh::Agent::LoadSettingsError
+
+        settings.stub(:mount_vmdk_disk)
+        settings.stub(:create_settings_mount_point)
+        settings.stub(:remove_vmdk_disk)
+      end
+
+      it 'should load settings' do
+        settings_mount_point = File.join(base_dir, 'bosh', 'settings')
+        env = File.join(settings_mount_point, 'env')
+        File
+          .should_receive(:read)
+          .with(env)
+          .and_return(settings_json_with_spaces)
+
+        settings.load_settings.should == Yajl::Parser.new.parse(settings_json)
+      end
+
+      it 'raises LoadSettingsError when it fails to read settings file' do
+        settings_mount_point = File.join(base_dir, 'bosh', 'settings')
+        env = File.join(settings_mount_point, 'env')
+        File
+          .should_receive(:read)
+          .with(env)
+          .and_raise Errno::ENOENT, "No such file or directory"
+        expect { settings.load_settings }
+          .to raise_exception Bosh::Agent::LoadSettingsError
+      end
+
+      it 'raises LoadSettingsError when it fails to parse settings file' do
+        settings_mount_point = File.join(base_dir, 'bosh', 'settings')
+        env = File.join(settings_mount_point, 'env')
+        File
+          .should_receive(:read)
+          .with(env)
+          .and_return(settings_json_with_spaces)
+        Yajl::Parser
+          .any_instance
+          .should_receive(:parse)
+          .with(settings_json)
+          .and_raise "Fail to parse json"
+
+        expect { settings.load_settings }
+          .to raise_exception Bosh::Agent::LoadSettingsError
+      end
     end
 
-    it 'should load settings' do
-      settings_mount_point = File.join(base_dir, 'bosh', 'settings')
-      env = File.join(settings_mount_point, 'env')
-      File
-        .should_receive(:read)
-        .with(env)
-        .and_return(settings_json)
+    describe 'find_settings_json' do
+      it 'retrieves json information' do
+        subject
+          .send(:find_settings_json, settings_json_with_spaces)
+          .should eql settings_json
+      end
 
-      settings.load_settings.should == Yajl::Parser.new.parse(settings_json)
-    end
+      context 'VM_ENVIRONMENT_SETTINGS_BEGIN string is missing' do
+        it 'raises an exception' do
+          content = settings_json_with_spaces
+          expect do
+            subject
+              .send(:find_settings_json, content[29..-1])
+           end.to raise_exception Bosh::Agent::LoadSettingsError,
+                                    'Unable to find string VM_ENVIRONMENT_SETTINGS_BEGIN in settings file'
+        end
+      end
 
-    it 'raises LoadSettingsError when it fails to read settings file' do
-      settings_mount_point = File.join(base_dir, 'bosh', 'settings')
-      env = File.join(settings_mount_point, 'env')
-      File
-        .should_receive(:read)
-        .with(env)
-        .and_raise Errno::ENOENT, "No such file or directory"
-      expect { settings.load_settings }
-        .to raise_exception Bosh::Agent::LoadSettingsError
-    end
-
-    it 'raises LoadSettingsError when it fails to parse settings file' do
-      settings_mount_point = File.join(base_dir, 'bosh', 'settings')
-      env = File.join(settings_mount_point, 'env')
-      File
-        .should_receive(:read)
-        .with(env)
-        .and_return(settings_json)
-      Yajl::Parser
-        .any_instance
-        .should_receive(:parse)
-        .with(settings_json)
-        .and_raise "Fail to parse json"
-
-      expect { settings.load_settings }
-        .to raise_exception Bosh::Agent::LoadSettingsError
+      context 'VM_ENVIRONMENT_SETTINGS_END string is missing' do
+        it 'raises an exception' do
+          content = settings_json_with_spaces
+          expect do
+            subject
+            .send(:find_settings_json, content[0..-27])
+          end.to raise_exception Bosh::Agent::LoadSettingsError,
+                                 'Unable to find string VM_ENVIRONMENT_SETTINGS_END in settings file'
+        end
+      end
     end
   end
 
@@ -204,5 +237,10 @@ eos
 
   def settings_json
     %q[{"vm":{"name":"vm-273a202e-eedf-4475-a4a1-66c6d2628742","id":"vm-51290"},"disks":{"ephemeral":1,"persistent":{"250":2},"system":0},"mbus":"nats://user:pass@11.0.0.11:4222","networks":{"network_a":{"netmask":"255.255.248.0","mac":"00:50:56:89:17:70","ip":"172.30.40.115","default":["gateway","dns"],"gateway":"172.30.40.1","dns":["172.30.22.153","172.30.22.154"],"cloud_properties":{"name":"VLAN440"}}},"blobstore":{"provider":"simple","options":{"password":"Ag3Nt","user":"agent","endpoint":"http://172.30.40.11:25250"}},"ntp":["ntp01.las01.emcatmos.com","ntp02.las01.emcatmos.com"],"agent_id":"a26efbe5-4845-44a0-9323-b8e36191a2c8"}]
+  end
+
+  def settings_json_with_spaces
+    space_size = 1000
+    "VM_ENVIRONMENT_SETTINGS_BEGIN#{settings_json}#{' ' * space_size}VM_ENVIRONMENT_SETTINGS_END"
   end
 end
