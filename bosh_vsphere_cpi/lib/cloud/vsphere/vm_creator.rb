@@ -80,18 +80,10 @@ module VSphereCloud
       vm = @client.wait_for_task(task)
 
       begin
-        @cpi.upload_file(cluster.datacenter.name, datastore.name, "#{name}/env.iso", '')
-
         vm_properties = @client.get_properties(vm, VimSdk::Vim::VirtualMachine, ['config.hardware.device'], ensure_all: true)
         devices = vm_properties['config.hardware.device']
 
-        # Configure the ENV CDROM
-        config = VimSdk::Vim::Vm::ConfigSpec.new
-        config.device_change = []
-        file_name = "[#{datastore.name}] #{name}/env.iso"
-        cdrom_change = @cpi.configure_env_cdrom(datastore.mob, devices, file_name)
-        config.device_change << cdrom_change
-        @client.reconfig_vm(vm, config)
+        @cpi.configure_vm_cdrom(cluster, datastore, name, vm, devices)
 
         network_env = @cpi.generate_network_env(devices, networks, dvs_index)
         disk_env = @cpi.generate_disk_env(system_disk, ephemeral_disk_config.device)
@@ -105,6 +97,7 @@ module VSphereCloud
 
         @logger.info("Powering on VM: #{vm} (#{name})")
         @client.power_on_vm(cluster.datacenter.mob, vm)
+        @cpi.wait_until_on(vm)
       rescue => e
         @logger.info("#{e} - #{e.backtrace.join("\n")}")
         @cpi.delete_vm(name)

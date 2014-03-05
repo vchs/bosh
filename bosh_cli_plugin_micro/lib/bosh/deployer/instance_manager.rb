@@ -251,6 +251,7 @@ module Bosh::Deployer
 
     def mount_disk(disk_cid)
       step 'Mount disk' do
+        wait_until_agent_ready
         agent.run_task(:mount_disk, disk_cid.to_s)
       end
     end
@@ -258,6 +259,7 @@ module Bosh::Deployer
     def unmount_disk(disk_cid)
       step 'Unmount disk' do
         if disk_info.include?(disk_cid)
+          wait_until_agent_ready
           agent.run_task(:unmount_disk, disk_cid.to_s)
         else
           logger.error("not unmounting #{disk_cid} as it doesn't belong to me: #{disk_info}")
