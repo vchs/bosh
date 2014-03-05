@@ -69,10 +69,12 @@ module Bosh::Director
     end
 
     def mount_disk(*args)
+      wait_until_ready
       send_long_running_message(:mount_disk, *args)
     end
 
     def unmount_disk(*args)
+      wait_until_ready
       send_long_running_message(:unmount_disk, *args)
     end
 
