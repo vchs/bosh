@@ -96,7 +96,7 @@ module Bosh::Dev::Bat
     def set_bat_env_variables
       @env['BAT_DEPLOYMENT_SPEC']  = File.join(artifacts.path, 'bat.yml')
       @env['BAT_DIRECTOR']         = @director_address.hostname
-      @env['BAT_DNS_HOST']         = @director_address.ip
+      @env['BAT_DNS_HOST']         = ENV['BAT_DNS_HOST']
       @env['BAT_STEMCELL']         = artifacts.bat_stemcell_path
       @env['BAT_VCAP_PRIVATE_KEY'] = @env['BOSH_OPENSTACK_PRIVATE_KEY'] || @env['BOSH_KEY_PATH']
       @env['BAT_VCAP_PASSWORD']    = 'c1oudc0w'
