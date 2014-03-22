@@ -55,7 +55,7 @@ module Bat
         when Bat::Deployment
           if @bosh_api.deployments.include?(what.name)
             @bosh_runner.bosh_safe("delete deployment #{what.name}").should succeed
-            what.delete
+            # what.delete
           end
         else
           raise "unknown cleanup: #{what}"
