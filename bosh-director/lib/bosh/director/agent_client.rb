@@ -69,7 +69,6 @@ module Bosh::Director
     end
 
     def list_disk(*args)
-      wait_until_ready
       send_message(:list_disk, *args)
     end
 
