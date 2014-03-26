@@ -68,6 +68,11 @@ module Bosh::Director
       send_long_running_message(:migrate_disk, *args)
     end
 
+    def list_disk(*args)
+      wait_until_ready
+      send_message(:list_disk, *args)
+    end
+
     def mount_disk(*args)
       wait_until_ready
       send_long_running_message(:mount_disk, *args)
