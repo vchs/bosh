@@ -68,13 +68,16 @@ module Bosh::Director
       send_long_running_message(:migrate_disk, *args)
     end
 
-    def mount_disk(*args)
+    def list_disk(*args)
       wait_until_ready
+      send_message(:list_disk, *args)
+    end
+
+    def mount_disk(*args)
       send_long_running_message(:mount_disk, *args)
     end
 
     def unmount_disk(*args)
-      wait_until_ready
       send_long_running_message(:unmount_disk, *args)
     end
 
@@ -218,6 +221,7 @@ module Bosh::Director
     end
 
     def send_long_running_message(method_name, *args)
+      wait_until_ready
       task = AgentMessageConverter.convert_old_message_to_new(send_message(method_name, *args))
       while task['state'] == 'running'
         sleep(DEFAULT_POLL_INTERVAL)
