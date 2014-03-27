@@ -413,12 +413,6 @@ module VSphereCloud
         raise "Disk not found: #{disk_cid}" if disk.nil?
 
         vm = get_vm_by_cid(vm_cid)
-        power_state = client.get_property(vm, Vim::VirtualMachine, 'runtime.powerState')
-        # Power off/on VM to refresh VM property
-        if @config.datacenter_srm && power_state != Vim::VirtualMachine::PowerState::POWERED_OFF
-          @logger.info("Powering off vm: #{vm_cid}")
-          client.power_off_vm(vm)
-        end
 
         datacenter = client.find_parent(vm, Vim::Datacenter)
         datacenter_name = client.get_property(datacenter, Vim::Datacenter, 'name')
@@ -503,6 +497,13 @@ module VSphereCloud
         @logger.info('Attaching disk')
         client.reconfig_vm(vm, config)
 
+        power_state = client.get_property(vm, Vim::VirtualMachine, 'runtime.powerState')
+        # Power off/on VM to refresh VM property
+        if @config.datacenter_srm && power_state != Vim::VirtualMachine::PowerState::POWERED_OFF
+          @logger.info("Powering off vm: #{vm_cid}")
+          sleep(50)
+          client.power_off_vm(vm)
+        end
         if @config.datacenter_srm && power_state == Vim::VirtualMachine::PowerState::POWERED_ON
           @logger.info("Powering on vm: #{vm_cid}")
           client.power_on_vm(datacenter, vm)
@@ -520,12 +521,6 @@ module VSphereCloud
         raise "Disk not found: #{disk_cid}" if disk.nil?
 
         vm = get_vm_by_cid(vm_cid)
-        power_state = client.get_property(vm, Vim::VirtualMachine, 'runtime.powerState')
-        # Power off/on VM to refresh VM property
-        if @config.datacenter_srm && power_state != Vim::VirtualMachine::PowerState::POWERED_OFF
-          @logger.info("Powering off vm: #{vm_cid}")
-          client.power_off_vm(vm)
-        end
 
         devices = client.get_property(vm, Vim::VirtualMachine, 'config.hardware.device', ensure_all: true)
 
@@ -565,6 +560,12 @@ module VSphereCloud
         end
         raise "Failed to detach disk: #{disk_cid} from vm: #{vm_cid}" unless virtual_disk.nil?
 
+        power_state = client.get_property(vm, Vim::VirtualMachine, 'runtime.powerState')
+        # Power off/on VM to refresh VM property
+        if @config.datacenter_srm && power_state != Vim::VirtualMachine::PowerState::POWERED_OFF
+          @logger.info("Powering off vm: #{vm_cid}")
+          client.power_off_vm(vm)
+        end
         if @config.datacenter_srm && power_state == Vim::VirtualMachine::PowerState::POWERED_ON
           @logger.info("Powering on vm: #{vm_cid}")
           datacenter = client.find_parent(vm, Vim::Datacenter)
