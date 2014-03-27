@@ -269,7 +269,7 @@ module Bosh::Agent
     end
 
     def mount_persistent_disk
-      if @settings['disks']['persistent'].keys.size > 1
+      if @settings['disks']['persistent'].keys.size > 2
         # hell on earth
         raise Bosh::Agent::FatalError, "Fatal: more than one persistent disk on boot"
       else
