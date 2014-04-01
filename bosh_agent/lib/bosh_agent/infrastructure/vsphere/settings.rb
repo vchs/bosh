@@ -167,9 +167,14 @@ module Bosh::Agent
     end
 
     def mount_vmdk_disk
-      vmdk_disk = (`ls /dev/sd* 2>&1`)
-                    .split(/\r?\n/)
-                    .last
+      vmdk_disk_line = (`blkid /dev/sd* 2>&1`)
+                          .split(/\r?\n/)
+                          .find { |s| s.include? 'LABEL="SRM01"' }
+      fail Bosh::Agent::LoadSettingsError,
+           'Unable to find disk of Label "SRM01"' if vmdk_disk_line.nil?
+
+      @logger.info("vmdk_disk_line: #{vmdk_disk_line}")
+      vmdk_disk = vmdk_disk_line.match(/(?<disk>\/dev\/sd\w+):/)[:disk]
       result = Bosh::Exec.sh "mount #{vmdk_disk} #@settings_mount_point 2>&1"
       fail Bosh::Agent::LoadSettingsError,
            "Failed to mount settings on #@settings_mount_point: #{result.output}" if result.failed?

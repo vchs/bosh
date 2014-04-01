@@ -860,18 +860,12 @@ vcenters:
       end
 
       it 'generates vmdk files successfully' do
-        vmdk_template =
-          File.expand_path('../../../../../../stemcell_builder/stages/system_vmdk_template/assets',
-                           __FILE__)
-        File
-          .should_receive(:join)
-          .with(anything, 'vmdk_template')
-          .and_return vmdk_template
+        vmdk_template = File.expand_path('../../../../../assets', __FILE__)
 
         @local_vmdk_file_dir = subject.send(:generate_vmdk, settings_json)
-        exists = File.exists?("#{@local_vmdk_file_dir}/env.vmdk")
+        exists = File.exists? File.join(@local_vmdk_file_dir, 'env.vmdk')
         exists.should == true
-        exists = File.exists?("#{@local_vmdk_file_dir}/env-flat.vmdk")
+        exists = File.exists? File.join(@local_vmdk_file_dir, 'env-flat.vmdk')
         exists.should == true
       end
 

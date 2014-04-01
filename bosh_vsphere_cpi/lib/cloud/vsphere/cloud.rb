@@ -1169,8 +1169,7 @@ module VSphereCloud
     end
 
     def generate_vmdk(env)
-      module_dir = (`ls -d /lib/modules/3.*-virtual | tail -1`).strip
-      vmdk_template_dir = File.join(module_dir, 'vmdk_template')
+      vmdk_template_dir = File.expand_path('../../../../assets', __FILE__)
       fail "vmdk_template_dir #{vmdk_template_dir} does not exist" unless File.exists?(vmdk_template_dir)
 
       path = Dir.mktmpdir
