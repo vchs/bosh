@@ -220,7 +220,6 @@ module Bosh::Stemcell
       [
         :system_open_vm_tools,
         :system_vsphere_cdrom,
-        :system_vmdk_template,
         # Misc
         :system_parameters,
         # Finalisation
