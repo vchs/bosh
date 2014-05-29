@@ -99,32 +99,6 @@ Can write RAM: 1
       properties = Bosh::Agent::Config.infrastructure.get_network_settings("test", {})
       properties.should be_nil
     end
-
-    describe '#check_cdrom' do
-      context 'when udev settle returns 0' do
-        before do
-          settings.stub(:udevadm_settle)
-        end
-
-        it 'succeeds' do
-          expect {
-            settings.send(:check_cdrom)
-          }.not_to raise_error
-        end
-      end
-
-      context 'when udev settle returns 1' do
-        before do
-          settings.stub(:udevadm_settle).and_raise(Bosh::Exec::Error.new(1, '/sbin/udevadm settle'))
-        end
-
-        it 'wraps the error so Bosh::Agent::Settings can deal with it appropriately' do
-          expect {
-            settings.send(:check_cdrom)
-          }.to raise_error(Bosh::Agent::LoadSettingsError)
-        end
-      end
-    end
   end
 
   context 'load settings from vmdk disk' do
